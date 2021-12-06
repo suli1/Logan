@@ -23,37 +23,68 @@
 import 'dart:async';
 import 'dart:core';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 class FlutterLogan {
   static const MethodChannel _channel = const MethodChannel('flutter_logan');
 
-  static Future<bool> init(
-      String aseKey, String aesIv, int maxFileLen) async {
-    final bool result = await _channel.invokeMethod('init',{'aesKey': aseKey, 'aesIv': aesIv, 'maxFileLen': maxFileLen});
+  static Future<bool> init(String aseKey, String aesIv, int maxFileLen) async {
+    final bool result = await _channel.invokeMethod('init', {
+      'aesKey': aseKey,
+      'aesIv': aesIv,
+      'maxFileLen': maxFileLen,
+    });
     return result;
   }
 
   static Future<void> log(int type, String log) async {
-    await _channel.invokeMethod('log', {'type': type, 'log': log});
+    try {
+      await _channel.invokeMethod('log', {'type': type, 'log': log});
+    } on PlatformException catch (e, s) {
+      print('Logan log failed:$e');
+      debugPrintStack(stackTrace: s);
+    }
   }
 
-  static Future<String> getUploadPath(String date) async {
-    final String result =
+  static Future<String?> getUploadPath(String date) async {
+    final String? result =
         await _channel.invokeMethod('getUploadPath', {'date': date});
     return result;
   }
 
-  static Future<bool> upload(String serverUrl, String date, String appId, String unionId, String deviceId) async {
-    final bool result = await _channel.invokeMethod('upload',{'date': date, 'serverUrl': serverUrl, 'appId': appId, 'unionId': unionId, 'deviceId': deviceId});
+  static Future<bool> upload({
+    required String serverUrl,
+    required String date,
+    required String appId,
+    required String unionId,
+    required String deviceId,
+  }) async {
+    final bool result = await _channel.invokeMethod('upload', {
+      'date': date,
+      'serverUrl': serverUrl,
+      'appId': appId,
+      'unionId': unionId,
+      'deviceId': deviceId
+    });
     return result;
   }
 
   static Future<void> flush() async {
-    await _channel.invokeMethod('flush');
+    try {
+      await _channel.invokeMethod('flush');
+    } on PlatformException catch (e, s) {
+      print('Logan flush failed:$e');
+      debugPrintStack(stackTrace: s);
+    }
   }
 
   static Future<void> cleanAllLogs() async {
-    await _channel.invokeMethod('cleanAllLogs');
+    try {
+      await _channel.invokeMethod('cleanAllLogs');
+    } on PlatformException catch (e, s) {
+      print('Logan cleanAllLogs failed:$e');
+      debugPrintStack(stackTrace: s);
+    }
   }
 }

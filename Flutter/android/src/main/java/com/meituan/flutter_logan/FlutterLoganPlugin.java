@@ -25,11 +25,17 @@ package com.meituan.flutter_logan;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
-
+import androidx.annotation.NonNull;
 import com.dianping.logan.Logan;
 import com.dianping.logan.LoganConfig;
 import com.dianping.logan.Util;
-
+import io.flutter.embedding.engine.plugins.FlutterPlugin;
+import io.flutter.plugin.common.BinaryMessenger;
+import io.flutter.plugin.common.MethodCall;
+import io.flutter.plugin.common.MethodChannel;
+import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
+import io.flutter.plugin.common.MethodChannel.Result;
+import io.flutter.plugin.common.PluginRegistry.Registrar;
 import java.io.File;
 import java.util.Map;
 import java.util.Set;
@@ -37,72 +43,82 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 
-import io.flutter.plugin.common.MethodCall;
-import io.flutter.plugin.common.MethodChannel;
-import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
-import io.flutter.plugin.common.MethodChannel.Result;
-import io.flutter.plugin.common.PluginRegistry.Registrar;
-
 /**
  * FlutterLoganPlugin
  */
-public class FlutterLoganPlugin implements MethodCallHandler {
+public class FlutterLoganPlugin implements FlutterPlugin, MethodCallHandler {
 
   private static Executor sExecutor;
-  private static Executor sMainExecutor = new Executor() {
-    private Handler mMainHandler = new Handler();
+  private static final Executor sMainExecutor = new Executor() {
+    private final Handler mainHandler = new Handler();
 
     @Override
     public void execute(Runnable runnable) {
       if (Looper.myLooper() == Looper.getMainLooper()) {
         runnable.run();
       } else {
-        mMainHandler.post(runnable);
+        mainHandler.post(runnable);
       }
     }
   };
-  private Context mContext;
-  private String mLoganFilePath;
+  private Context applicationContext;
 
-  /**
-   * Plugin registration.
-   */
+  private MethodChannel methodChannel;
+
+  private String loganFilePath;
+
+  /** Plugin registration. */
+  @SuppressWarnings("deprecation")
   public static void registerWith(Registrar registrar) {
-    final MethodChannel channel = new MethodChannel(registrar.messenger(), "flutter_logan");
-    channel.setMethodCallHandler(new FlutterLoganPlugin(registrar.context()));
+    final FlutterLoganPlugin instance = new FlutterLoganPlugin();
+    instance.onAttachedToEngine(registrar.context(), registrar.messenger());
   }
 
-  public FlutterLoganPlugin(Context context) {
-    mContext = context.getApplicationContext();
+  @Override
+  public void onAttachedToEngine(@NonNull FlutterPluginBinding binding) {
+    onAttachedToEngine(binding.getApplicationContext(), binding.getBinaryMessenger());
+  }
+
+  private void onAttachedToEngine(Context applicationContext, BinaryMessenger messenger) {
+    this.applicationContext = applicationContext;
+    methodChannel = new MethodChannel(messenger, "flutter_logan");
+    methodChannel.setMethodCallHandler(this);
+  }
+
+  @Override
+  public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
+    applicationContext = null;
+    methodChannel.setMethodCallHandler(null);
+    methodChannel = null;
   }
 
   /**
    * @param result the reply methods of result MUST be invoked on main thread
    */
   @Override
-  public void onMethodCall(MethodCall call, Result result) {
+  public void onMethodCall(@NonNull MethodCall call, @NonNull Result result) {
     switch (call.method) {
-    case "init":
-      loganInit(call.arguments, result);
-      break;
-    case "log":
-      log(call.arguments, result);
-      break;
-    case "flush":
-      flush(result);
-      break;
-    case "getUploadPath":
-      getUploadPath(call.arguments, result);
-      break;
-    case "upload":
-      uploadToServer(call.arguments, result);
-      break;
-    case "cleanAllLogs":
-      cleanAllLog(result);
-      break;
-    default:
-      result.notImplemented();
-      break;
+      case "init":
+        loganInit(call.arguments, result);
+        break;
+      case "log":
+        log(call.arguments, result);
+        break;
+      case "flush":
+        flush(result);
+        break;
+      case "getUploadPath":
+        getUploadPath(call.arguments, result);
+        break;
+      case "upload":
+        uploadToServer(call.arguments, result);
+        break;
+      case "cleanAllLogs":
+        cleanAllLog(result);
+        break;
+      default:
+        result.notImplemented();
+        break;
     }
   }
 
@@ -116,7 +132,7 @@ public class FlutterLoganPlugin implements MethodCallHandler {
   }
 
   private void loganInit(Object args, Result result) {
-    final File file = mContext.getExternalFilesDir(null);
+    final File file = applicationContext.getExternalFilesDir(null);
     if (file == null) {
       result.success(false);
       return;
@@ -143,11 +159,11 @@ public class FlutterLoganPlugin implements MethodCallHandler {
       result.success(false);
       return;
     }
-    mLoganFilePath = file.getAbsolutePath() + File.separator + "logan_v1";
-    builder.setCachePath(mContext.getFilesDir().getAbsolutePath())
-           .setPath(mLoganFilePath)
-           .setEncryptKey16(encryptKey.getBytes())
-           .setEncryptIV16(encryptIV.getBytes());
+    loganFilePath = file.getAbsolutePath() + File.separator + "logan_v1";
+    builder.setCachePath(applicationContext.getFilesDir().getAbsolutePath())
+        .setPath(loganFilePath)
+        .setEncryptKey16(encryptKey.getBytes())
+        .setEncryptIV16(encryptIV.getBytes());
     Logan.init(builder.build());
     result.success(true);
   }
@@ -185,26 +201,26 @@ public class FlutterLoganPlugin implements MethodCallHandler {
 
   private void getUploadPath(final Object args, final Result result) {
     if (!(args instanceof Map)) {
-      result.success("");
+      result.success(null);
       return;
     }
-    if (Utils.isEmpty(mLoganFilePath)) {
-      result.success("");
+    if (Utils.isEmpty(loganFilePath)) {
+      result.success(null);
       return;
     }
     checkAndInitExecutor();
     sExecutor.execute(new Runnable() {
       @Override
       public void run() {
-        File dir = new File(mLoganFilePath);
+        File dir = new File(loganFilePath);
         if (!dir.exists()) {
-          replyOnMainThread(result, "");
+          replyOnMainThread(result, null);
           return;
         }
         final String date = Utils.getString((Map) args, "date");
         File[] files = dir.listFiles();
         if (files == null) {
-          replyOnMainThread(result, "");
+          replyOnMainThread(result, null);
           return;
         }
         for (File file : files) {
@@ -218,13 +234,13 @@ public class FlutterLoganPlugin implements MethodCallHandler {
             e.printStackTrace();
           }
         }
-        replyOnMainThread(result, "");
+        replyOnMainThread(result, null);
       }
     });
   }
 
   private void cleanAllLog(final Result result) {
-    if (Utils.isEmpty(mLoganFilePath)) {
+    if (Utils.isEmpty(loganFilePath)) {
       result.success(null);
       return;
     }
@@ -233,7 +249,7 @@ public class FlutterLoganPlugin implements MethodCallHandler {
       @Override
       public void run() {
         try {
-          File dir = new File(mLoganFilePath);
+          File dir = new File(loganFilePath);
           Utils.deleteRecursive(dir, false);
         } catch (Exception ignored) {
         } finally {
@@ -268,7 +284,6 @@ public class FlutterLoganPlugin implements MethodCallHandler {
       }
     }
     sendLogRunnable.setUrl(serverUrl);
-    Logan.s(new String[]{date}, sendLogRunnable);
+    Logan.s(new String[] { date }, sendLogRunnable);
   }
-
 }

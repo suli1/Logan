@@ -1,8 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_logan/flutter_logan.dart';
-import 'package:flutter/material.dart';
 
 void main() => runApp(MyApp());
 
@@ -54,8 +54,9 @@ class _MyAppState extends State<MyApp> {
     String result;
     try {
       final today = DateTime.now();
-      final date = "${today.year.toString()}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
-      final String path = await FlutterLogan.getUploadPath(date);
+      final date =
+          "${today.year.toString()}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
+      final String? path = await FlutterLogan.getUploadPath(date);
       if (path != null) {
         result = 'upload path = ' + path;
       } else {
@@ -100,14 +101,15 @@ class _MyAppState extends State<MyApp> {
     String result = 'Failed upload to server';
     try {
       final today = DateTime.now();
-      final date = "${today.year.toString()}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
+      final date =
+          "${today.year.toString()}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
       final bool back = await FlutterLogan.upload(
-          'http://127.0.0.1:3000/logupload',
-          date,
-          'FlutterTestAppId',
-          'FlutterTestUnionId',
-          'FlutterTestDeviceId'
-          );
+        serverUrl: 'http://127.0.0.1:3000/logupload',
+        date: date,
+        appId: 'FlutterTestAppId',
+        unionId: 'FlutterTestUnionId',
+        deviceId: 'FlutterTestDeviceId',
+      );
       if (back) {
         result = 'Upload to server succeed';
       }
@@ -120,13 +122,13 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
-  Widget buttonWidge(String title, Function event) {
+  Widget buttonWidge(String title, VoidCallback event) {
     Color color = Theme.of(context).primaryColor;
-    return new Column(
+    return Column(
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        new FlatButton(
+        FlatButton(
           onPressed: event,
           child: Text(title),
           color: color,
@@ -137,7 +139,7 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    Widget buttonSection = new Column(
+    Widget buttonSection = Column(
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -150,7 +152,7 @@ class _MyAppState extends State<MyApp> {
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             buttonWidge('log', log),
-            buttonWidge('getUploadUrl', getUploadPath),
+            buttonWidge('getUploadPath', getUploadPath),
             buttonWidge('uploadToServer', uploadToServer),
           ],
         ),
@@ -164,13 +166,13 @@ class _MyAppState extends State<MyApp> {
           ),
           body: Column(
             children: [
-              new Container(
+              Container(
                 margin: const EdgeInsets.only(top: 30.0),
                 child: buttonSection,
               ),
-              new Container(
-                margin: const EdgeInsets.only(top: 30.0,left: 10,right: 10),
-                child: new Text(_showText),
+              Container(
+                margin: const EdgeInsets.only(top: 30.0, left: 10, right: 10),
+                child: Text(_showText),
               )
             ],
           )),
